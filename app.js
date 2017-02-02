@@ -2,8 +2,8 @@ var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
-var port = process.env.PORT || 3000;
-
+var port = process.env.PORT || 3000; // Allow for Heroku dynamic ports
+var messageoftheday = 'welcome'; // Default MOTD
 http.listen(port, console.log('listening on: '+port));
 
 // admin password thing
@@ -12,9 +12,17 @@ function randomIntInc(low, high) { // https://blog.tompawlak.org/generate-random
 }
 var adminpassword = randomIntInc(1000, 9999);
 
-console.log('Admin Password:' + adminpassword);
+console.log('Admin password: ' + adminpassword);
 
 console.log('local address: ' + require('ip').address() + ':' + port);
+getIP = require('external-ip')();
+getIP(function(err, ip){
+	if(err){
+		console.log('An error occurred while fetching the external ip address');
+	}else{
+		console.log('external address: ' + ip + ':' + port);
+	}
+});
 
 app.get('/', function(req, res){
   res.sendFile(__dirname + '/public/index.html');
@@ -47,15 +55,15 @@ io.on('connection', function(socket){
 	socket.on('getusers', function(){
 		socket.emit('usersonline', nicknames);
 	});
-	socket.on('printadmin', function(){
+	socket.on('printadmin', function(){ // When someone does /operator without arguments in the chat console print the password in the command line/log.
 		console.log('Admin password: ' + adminpassword);
 	});
-	socket.on('verifyadmin', function(password){
+	socket.on('verifyadmin', function(password){ // Verify admin passcodes
 		if(password == adminpassword){
 			socket.emit('verified');
 		}
 	});
-	socket.on('userconnect', function(nick){
+	socket.on('userconnect', function(nick){ // When someone connects...
 		if(nicknames.indexOf(nick) != -1){
 			socket.emit('usernametaken', nick);
 		}else{
@@ -64,12 +72,30 @@ io.on('connection', function(socket){
 			console.log(nick + ' connected');
 		}
 	});
+  socket.on('permban', function(user){
+    io.emit('permban', user);
+    io.emit('chat message', {nickname: 'Server', message: user+' was permanently banned!'})
 
+  });
 	socket.on('mute', function(user){
+<<<<<<< HEAD
 		console.log('muted ' + user);
+=======
+		io.emit('mute', user);
+    io.emit('chat message', {nickname: 'Server', message: user+' was muted!'})
+
+>>>>>>> master
 	});
+  socket.on('motd', function(motd){
+    messageoftheday = motd;
+    console.log('MOTD changed to: ' + messageoftheday);
+    io.emit('motd', messageoftheday);
+  })
+  socket.on('getmotd', function(){
+    socket.emit('motd', messageoftheday);
+  })
 	socket.on('userdisconnect', function(nick){
-		io.emit('chat message', {nickname: nick, message:' left the conversation'});
+		io.emit('chat message', {nickname: 'Server', message:nick+' left the conversation'});
 		console.log(nick + ' left the conversation')
 		nicknames.splice(nicknames.indexOf(nick), 1);
 	});
